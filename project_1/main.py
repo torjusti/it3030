@@ -27,7 +27,8 @@ class FullyConnectedLayer:
             self.activation = self._sigmoid
 
         # Initialize the weights and biases with small random numbers.
-        self.weights = np.random.randn(nodes, input_size)
+        # TODO: Should I scale this by some factor?
+        self.weights = np.random.randn(nodes, input_size) / 2
         self.bias = np.random.randn(nodes, 1)
 
     def _linear(self, x, derivative=False):
@@ -47,7 +48,10 @@ class FullyConnectedLayer:
     def _relu(self, x, derivative=False):
         """ ReLU activation function. """
         if derivative:
-            return np.sign(x)
+            out = np.copy(x)
+            out[out <= 0] = 0
+            out[out > 0] = 1
+            return out
 
         return np.maximum(x, 0)
 
@@ -226,12 +230,18 @@ def main():
 
     network = SequentialNetwork(layers, cost_function=config['MODEL']['loss_type'])
 
+    # TODO: Do we need to normalize by `n` anywhere?
+
     network.train(train_data, train_labels,
         lr=float(config['HYPER']['learning_rate']), epochs=int(config['HYPER']['no_epochs']),
         regularization=float(config['HYPER']['L2_regularization']))
 
     # TODO: Validate trained model.
     # TODO: Dump training data to file.
+    # TODO: ReLU exploding gradients - how to approach?
+    # TODO: Check parameter normalization.
+    # TODO: Check dividing by N and that all loss formulas are correct.
+    # TODO: Minibatching og slikt.
 
 if __name__ == '__main__':
     main()
