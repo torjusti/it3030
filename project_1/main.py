@@ -156,6 +156,7 @@ class SequentialNetwork:
         if self.loss_name == 'cross_entropy':
             # If we assume that softmax is used for the
             # last layer, this is the backprop delta.
+            # TODO: It might be that this should be scaled by a factor 1 / N.
             error = last_layer.a - target
         else:
             # Standard backpropagation base case.
