@@ -25,15 +25,10 @@ class FullyConnectedLayer:
         elif activation == 'sigmoid':
             self.activation = self._sigmoid
 
-        # Initialize the weights and biases with small random numbers.
-        # TODO: Should this be scaled by some factor? ReLU is dying.
-        self.weights = np.random.randn(nodes, input_size)
+        # Initialize the weights and biases with small random numbers
+        # normalized by the square root of incoming input nodes.
+        self.weights = np.random.randn(nodes, input_size) / input_size ** 0.5
         self.bias = np.random.randn(nodes, 1)
-
-        # Gradients which are computed using backpropagation are initially
-        # set to 0 to simplify computations later on in `SequentialNetwork`.
-        self.weight_gradient = np.zeros(self.weights.shape)
-        self.bias_gradient = np.zeros(self.bias.shape)
 
     def _linear(self, x, derivative=False):
         """ Linear activation function. """
@@ -105,17 +100,17 @@ class SequentialNetwork:
     def l2_loss(self, output, target, derivative=False):
         """ Mean Squared Error loss function for regression. """
         if derivative:
-            # TODO: Do we need the factor of 2 outside this?
             return output - target
 
-        # TODO: Should regularization be added here, or can it be ignored?
-        return np.sum((target - output) ** 2)
+        return np.sum((target - output) ** 2, axis=0)
 
     def _cross_entropy(self, output, target, derivative=False):
         """ Cross Entropy loss function for classification. """
-        # TODO: Should regularization be added here, or can it be ignored?
-        # TODO: This might not be completely equal to the slide formula.
-        return -np.sum(target * np.log(output))
+        if derivative:
+            # The cross entropy delta is handled directly in the `backpropagation` method.
+            raise NotImplementedError
+
+        return -np.sum(target * np.log(output) + (1 - target) * np.log(1 - output), axis=0)
 
     def forward(self, x):
         """ Perform a forward pass through the network. """
@@ -124,53 +119,44 @@ class SequentialNetwork:
 
         return x
 
-    def update_gradient(self, error, layer, input_vector):
+    def update_gradient(self, error, layer, samples):
         """ Update the current minibatch gradient. Normalization is done when
         performing the actual update in `update_weights`. """
-        previous_activations = input_vector if layer == 0 else self.layers[layer - 1].a
-        self.layers[layer].weight_gradient += np.dot(error, previous_activations.transpose())
-        self.layers[layer].bias_gradient += error
+        previous_activations = samples if layer == 0 else self.layers[layer - 1].a
+        self.layers[layer].weight_gradient = np.dot(error, previous_activations.transpose())
+        self.layers[layer].bias_gradient = error.sum(axis=1).reshape(error.shape[0], 1)
 
     def update_weights(self, lr, regularization, example_count):
         """ Update all the weights in the network after computing average gradient\
         from a minibatch. This also clears out the gradient in each layer. """
         for layer in self.layers:
             # Update the weights and add regularization.
-            # TODO: Should regularization be scaled with number of training examples?
-            # TODO: What is the difference between alpha and lambda guys?
-            # TODO: In slides, regularization has a constant factor. Do we need it?
             layer.weights -= lr * (layer.weight_gradient / example_count + regularization * layer.weights)
             # Update the bias vector. Regularization is not needed here, since
             # the regularization penalty function is not a function of the bias.
-            # TODO: Should this also have a regularization term, since the assignment mentions that?
             layer.bias -= lr * layer.bias_gradient / example_count
-            # Clear out the gradient for the next minibatch.
-            layer.weight_gradient[:] = 0
-            layer.bias_gradient[:] = 0
 
-    def backpropagate(self, activation, input_vector, target, lr, regularization):
+    def backpropagate(self, activation, samples, targets, lr, regularization):
         """ Update the network weights using backpropagation for gradient computation. """
         last_layer = self.layers[len(self.layers) - 1]
 
         # Compute the delta for the last layer.
         if self.loss_name == 'cross_entropy':
-            # If we assume that softmax is used for the
-            # last layer, this is the backprop delta.
-            # TODO: It might be that this should be scaled by a factor 1 / N.
-            error = last_layer.a - target
+            # If we assume that softmax is used for the last layer, this is the backprop delta.
+            error = last_layer.a - targets
         else:
             # Standard backpropagation base case.
-            error = self.loss(activation, target, derivative=True) * last_layer.activation(
+            error = self.loss(activation, targets, derivative=True) * last_layer.activation(
                 last_layer.z, derivative=True)
 
-        self.update_gradient(error, len(self.layers) - 1, input_vector)
+        self.update_gradient(error, len(self.layers) - 1, samples)
 
         for i in range(len(self.layers) - 2, -1, -1):
             # Compute the error for the next-up layer.
             error = self.layers[i].activation(self.layers[i].z, derivative=True) \
                 * np.dot(self.layers[i + 1].weights.transpose(), error)
 
-            self.update_gradient(error, i, input_vector)
+            self.update_gradient(error, i, samples)
 
     def predict(self, x):
         """ Perform a prediction using the network. """
@@ -192,35 +178,21 @@ class SequentialNetwork:
         for epoch in range(1, epochs + 1):
             train_loss = 0
 
-            for i in range(data.shape[1]):
-                # We lose a dimension when indexing, so reshape data to a column vector.
-                target = labels[:, i].reshape(labels.shape[0], 1)
-                input_vector = data[:, i].reshape(data.shape[0], 1)
+            for i in range(0, data.shape[1], batch_size):
+                # Get training data for this minipatch.
+                samples = data[:, i:i+8]
+                # Get labels corresponding to this minibatch.
+                targets = labels[:, i:i+8]
+                # Pass the entire minibatch through the network at once.
+                activation = self.forward(samples)
+                # Add the training loss for this minibatch.
+                train_loss += self.loss(activation, targets).sum()
+                # Compute the network gradients using backpropagation.
+                self.backpropagate(activation, samples, targets, lr, regularization)
+                # Update the weights using gradient descent.
+                self.update_weights(lr, regularization, samples.shape[1])
 
-                activation = self.forward(input_vector)
-
-                train_loss += self.loss(activation, target)
-
-                # Update gradient using backpropagation.
-                self.backpropagate(activation, input_vector, target, lr, regularization)
-
-                # Update gradient at the end of each batch, or at last sample.
-                if i % batch_size == (batch_size - 1) or i == data.shape[1] - 1:
-                    # Handle non-complete batches at end of dataset.
-                    effective_batch_size = (i % batch_size) + 1
-                    # Update weights with computed gradient.
-                    self.update_weights(lr, regularization, effective_batch_size)
-
-            val_loss = 0
-
-            for i in range(val_data.shape[1]):
-                # Note that for classification, the validation data is not one-hot encoded.
-                target = val_labels[:, i].reshape(val_labels.shape[0], 1)
-                input_vector = val_data[:, i].reshape(val_data.shape[0], 1)
-
-                activation = self.forward(input_vector)
-
-                val_loss += self.loss(activation, target)
+            val_loss = self.loss(self.forward(val_data), val_labels).sum()
 
             train_loss /= data.shape[1]
             val_loss /= val_data.shape[1]
@@ -236,7 +208,6 @@ class SequentialNetwork:
 
             print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}')
 
-        plt.show()
 
     def dump_weights(self, filename):
         """ Dump learned weights to file as a string. """
@@ -244,7 +215,6 @@ class SequentialNetwork:
             # Disable truncation in output.
             with np.printoptions(threshold=np.inf):
                 for layer in self.layers:
-                    # TODO: Skal vi serr ikke bruke NumPy greiene for å lagre til fil?
                     f.write(str(layer.weights))
                     f.write(str(layer.bias))
                     f.write('\n')
@@ -290,8 +260,6 @@ def main():
 
     previous_width = train_data.shape[0]
 
-    # TODO: Handle the hidden layer shit correctly, and the no hidden layer shit.
-    # TODO: Regression without hidden layer should be fine. But should classification have multiple logits?
     for i, layer in enumerate(layer_sizes):
         layers.append(FullyConnectedLayer(previous_width, layer,
             activation=layer_activations[i]))
@@ -304,7 +272,6 @@ def main():
         lr=float(config['HYPER']['learning_rate']), epochs=int(config['HYPER']['no_epochs']),
         regularization=float(config['HYPER']['L2_regularization']), batch_size=8)
 
-    # TODO: When to dump? After all epochs finished? What format?
     network.dump_weights('weights.txt')
 
 
