@@ -5,14 +5,8 @@ Solutions for the NTNU course IT3030.
 
 ## To do
 
-- Handle the hidden layer shit correctly, and the no hidden layer shit.
-- Regression without hidden layer should be fine. But should classification have multiple logits?
-- Should regularization be scaled with number of training examples?
-- What is the difference between alpha and lambda guys?
-- In slides, regularization has a constant factor. Do we need it?
-- Should bias also have a regularization term, since the assignment mentions that
-- When to dump? After all epochs finished? What format?
-- Skal vi serr ikke bruke NumPy greiene for å lagre til fil?
-- Trenger vi faktor av 2 utenfor L2 loss?
-- Trenger vi å regularisere loss-funksjonene eller bare håndtere det i deriverte?
-- Sjekk at koden ikke kræsjer hvis mengden av data er multippel av 8.
+- Handle hidden layer + 0 hidden layers. Should classification have multiple logits given 0 hidden layers?
+- Should the regularization factor be scaled with the number of training examples? And do we need to divide by 2 in addition to having the alpha? Why does the exercise refer to a lambda? Should the bias also have a regularization term?
+- When should we dump? After all epochs are finished? In what format should the file be stored? Should we not use NumPy to save?
+- Do we need to multiply the L2 loss derivative by 2?
+- Do we need to add the regularization to the loss functions and dump it or just handle it in the derivative?

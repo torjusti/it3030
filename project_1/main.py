@@ -169,7 +169,7 @@ class SequentialNetwork:
         # Get number from matrix.
         return np.squeeze(x)
 
-    def train(self, data, labels, val_data, val_labels, epochs=50,
+    def train(self, data, labels, val_data=None, val_labels=None, epochs=50,
               lr=0.01, batch_size=8, regularization=0):
         """ Train the network. """
         train_losses = []
@@ -180,9 +180,9 @@ class SequentialNetwork:
 
             for i in range(0, data.shape[1], batch_size):
                 # Get training data for this minipatch.
-                samples = data[:, i:i+8]
+                samples = data[:, i:i+batch_size]
                 # Get labels corresponding to this minibatch.
-                targets = labels[:, i:i+8]
+                targets = labels[:, i:i+batch_size]
                 # Pass the entire minibatch through the network at once.
                 activation = self.forward(samples)
                 # Add the training loss for this minibatch.
@@ -192,13 +192,15 @@ class SequentialNetwork:
                 # Update the weights using gradient descent.
                 self.update_weights(lr, regularization, samples.shape[1])
 
-            val_loss = self.loss(self.forward(val_data), val_labels).sum()
-
             train_loss /= data.shape[1]
-            val_loss /= val_data.shape[1]
-
             train_losses.append(train_loss)
-            val_losses.append(val_loss)
+
+            validate = val_data is not None and val_labels is not None
+
+            if validate:
+                val_loss = self.loss(self.forward(val_data), val_labels).sum()
+                val_loss /= val_data.shape[1]
+                val_losses.append(val_loss)
 
             # Animate addition of new losses.
             plt.axis(ylim=[0, max(train_losses + val_losses)])
@@ -206,8 +208,12 @@ class SequentialNetwork:
             plt.plot(val_losses, 'r')
             plt.pause(0.05)
 
-            print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}')
+            if validate:
+                print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}')
+            else:
+                print(f'Epoch {epoch}: training loss {train_loss}')
 
+        plt.show()
 
     def dump_weights(self, filename):
         """ Dump learned weights to file as a string. """
