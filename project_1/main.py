@@ -158,17 +158,6 @@ class SequentialNetwork:
 
             self.update_gradient(error, i, samples)
 
-    def predict(self, x):
-        """ Perform a prediction using the network. """
-        activation = self.forward(x)
-
-        # Handle classification with argmax.
-        if self.loss_name == 'cross_entropy':
-            return np.argmax(activation)
-
-        # Get number from matrix.
-        return np.squeeze(x)
-
     def train(self, data, labels, val_data=None, val_labels=None, epochs=50,
               lr=0.01, batch_size=8, regularization=0):
         """ Train the network. """
