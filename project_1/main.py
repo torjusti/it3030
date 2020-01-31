@@ -97,20 +97,25 @@ class SequentialNetwork:
 
         self.layers = layers
 
-    def l2_loss(self, output, target, derivative=False):
+    def l2_regularization(self):
+        """ Sum of squared weights across the neural network. """
+        return sum(np.sum(layer.weights) for layer in self.layers)
+
+    def l2_loss(self, output, target, regularization, derivative=False):
         """ Mean Squared Error loss function for regression. """
         if derivative:
             return output - target
 
-        return np.sum((target - output) ** 2, axis=0)
+        return np.sum((target - output) ** 2, axis=0) + regularization * self.l2_regularization()
 
-    def _cross_entropy(self, output, target, derivative=False):
+    def _cross_entropy(self, output, target, regularization, derivative=False):
         """ Cross Entropy loss function for classification. """
         if derivative:
             # The cross entropy delta is handled directly in the `backpropagation` method.
             raise NotImplementedError
 
-        return -np.sum(target * np.log(output) + (1 - target) * np.log(1 - output), axis=0)
+        return -np.sum(target * np.log(output) + (1 - target) * np.log(1 - output), axis=0) \
+            + regularization * self.l2_regularization()
 
     def forward(self, x):
         """ Perform a forward pass through the network. """
@@ -146,8 +151,8 @@ class SequentialNetwork:
             error = last_layer.a - targets
         else:
             # Standard backpropagation base case.
-            error = self.loss(activation, targets, derivative=True) * last_layer.activation(
-                last_layer.z, derivative=True)
+            error = self.loss(activation, targets, regularization, derivative=True) \
+                * last_layer.activation( last_layer.z, derivative=True)
 
         self.update_gradient(error, len(self.layers) - 1, samples)
 
@@ -175,7 +180,7 @@ class SequentialNetwork:
                 # Pass the entire minibatch through the network at once.
                 activation = self.forward(samples)
                 # Add the training loss for this minibatch.
-                train_loss += self.loss(activation, targets).sum()
+                train_loss += self.loss(activation, targets, regularization).sum()
                 # Compute the network gradients using backpropagation.
                 self.backpropagate(activation, samples, targets, lr, regularization)
                 # Update the weights using gradient descent.
@@ -187,15 +192,17 @@ class SequentialNetwork:
             validate = val_data is not None and val_labels is not None
 
             if validate:
-                val_loss = self.loss(self.forward(val_data), val_labels).sum()
+                # Compute loss on validation set.
+                val_loss = self.loss(self.forward(val_data), val_labels, regularization).sum()
+                val_loss /= val_data.shape[1]
+                val_losses.append(val_loss)
 
+                # Compute accuracy on validation set.
                 predictions = np.argmax(self.forward(val_data), axis=0)
                 targets = np.argmax(val_labels, axis=0)
                 correct = np.count_nonzero(predictions == targets)
-                print(correct, val_data.shape[1], correct / val_data.shape[1])
+                accuracy = correct / val_data.shape[1]
 
-                val_loss /= val_data.shape[1]
-                val_losses.append(val_loss)
 
             # Animate addition of new losses.
             plt.axis(ylim=[0, max(train_losses + val_losses)])
@@ -204,7 +211,7 @@ class SequentialNetwork:
             plt.pause(0.05)
 
             if validate:
-                print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}')
+                print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}, accuracy {accuracy}')
             else:
                 print(f'Epoch {epoch}: training loss {train_loss}')
 
@@ -262,11 +269,19 @@ def main():
 
     previous_width = train_data.shape[0]
 
+    # Add hidden layers.
     for i, layer in enumerate(layer_sizes):
         layers.append(FullyConnectedLayer(previous_width, layer,
             activation=layer_activations[i]))
 
         previous_width = layer
+
+    # Add output layer.
+    if config['MODEL']['loss_type'] == 'cross_entropy':
+        layers.append(FullyConnectedLayer(previous_width,
+            val_labels.shape[0], activation='softmax'))
+    elif config['MODEL']['loss_type'] == 'L2':
+        layers.append(FullyConnectedLayer(previous_width, 1, activation='linear'))
 
     network = SequentialNetwork(layers, cost_function=config['MODEL']['loss_type'])
 
