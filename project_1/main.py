@@ -40,7 +40,7 @@ class FullyConnectedLayer:
     def _tanh(self, x, derivative=False):
         """ Hyperbolic tangent activation function. """
         if derivative:
-            return (np.cosh(x) ** 2 - np.sinh(x) ** 2) / np.cosh(x) ** 2
+            return 1 - np.tanh(x) ** 2
 
         return np.tanh(x)
 
@@ -127,7 +127,7 @@ class SequentialNetwork:
         self.layers[layer].bias_gradient = error.sum(axis=1).reshape(error.shape[0], 1)
 
     def update_weights(self, lr, regularization, example_count):
-        """ Update all the weights in the network after computing average gradient\
+        """ Update all the weights in the network after computing average gradient
         from a minibatch. This also clears out the gradient in each layer. """
         for layer in self.layers:
             # Update the weights and add regularization.
@@ -199,6 +199,12 @@ class SequentialNetwork:
 
             if validate:
                 val_loss = self.loss(self.forward(val_data), val_labels).sum()
+
+                predictions = np.argmax(self.forward(val_data), axis=0)
+                targets = np.argmax(val_labels, axis=0)
+                correct = np.count_nonzero(predictions == targets)
+                print(correct, val_data.shape[1], correct / val_data.shape[1])
+
                 val_loss /= val_data.shape[1]
                 val_losses.append(val_loss)
 
@@ -256,6 +262,7 @@ def main():
     # If loss is cross-entropy, we assume a classification problem.
     if config['MODEL']['loss_type'] == 'cross_entropy':
         train_labels = one_hot(train_labels)
+        val_labels = one_hot(val_labels)
 
     # Read layer sizes from config file.
     layer_sizes = [int(size.strip()) for size in config['MODEL']['layers'].split(',')]
