@@ -114,8 +114,9 @@ class SequentialNetwork:
             # The cross entropy delta is handled directly in the `backpropagation` method.
             raise NotImplementedError
 
-        return -np.sum(target * np.log(output) + (1 - target) * np.log(1 - output), axis=0) \
-            + regularization * self.l2_regularization()
+        # Add a small positive number to prevent taking the log of 0.
+        return -np.sum(target * np.log(output + 1e-15) + (1 - target) * np.log(
+            1 - output + 1e-15), axis=0) + regularization * self.l2_regularization()
 
     def forward(self, x):
         """ Perform a forward pass through the network. """
@@ -164,7 +165,7 @@ class SequentialNetwork:
             self.update_gradient(error, i, samples)
 
     def train(self, data, labels, val_data=None, val_labels=None, epochs=50,
-              lr=0.01, batch_size=8, regularization=0):
+              lr=0.01, batch_size=8, regularization=0, plot=True):
         """ Train the network. """
         train_losses = []
         val_losses = []
@@ -203,19 +204,23 @@ class SequentialNetwork:
                 correct = np.count_nonzero(predictions == targets)
                 accuracy = correct / val_data.shape[1]
 
+            if plot != -1 and epoch % plot == 0:
+                # Animate addition of new losses.
+                plt.plot(train_losses, 'b', label="Training loss")
+                plt.plot(val_losses, 'r', label="Validation loss")
 
-            # Animate addition of new losses.
-            plt.axis(ylim=[0, max(train_losses + val_losses)])
-            plt.plot(train_losses, 'b')
-            plt.plot(val_losses, 'r')
-            plt.pause(0.05)
+                if epoch == 1:
+                    plt.legend()
+
+                plt.pause(0.05)
 
             if validate:
                 print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}, accuracy {accuracy}')
             else:
                 print(f'Epoch {epoch}: training loss {train_loss}')
 
-        plt.show()
+        if plot != -1:
+            plt.show()
 
     def dump_weights(self, filename):
         """ Dump learned weights to file as a string. """
@@ -253,41 +258,53 @@ def main():
     config.read(sys.argv[1])
 
     train_data, train_labels = load_data(config['DATA']['training'])
-    val_data, val_labels = load_data(config['DATA']['validation'])
+
+    val_data, val_labels = None, None
+
+    if 'validation' in config['DATA']:
+        val_data, val_labels = load_data(config['DATA']['validation'])
 
     # If loss is cross-entropy, we assume a classification problem.
     if config['MODEL']['loss_type'] == 'cross_entropy':
         train_labels = one_hot(train_labels)
-        val_labels = one_hot(val_labels)
+
+        if val_labels is not None:
+            val_labels = one_hot(val_labels)
 
     # Read layer sizes from config file.
     layer_sizes = [int(size.strip()) for size in config['MODEL']['layers'].split(',')]
     # Read layer activation functions from config file.
-    layer_activations = [a.strip() for a in config['MODEL']['activations'].split(',')]
+    layer_activations = [a.strip() for a in config['MODEL']['activations'].split(',')] \
+        if 'activations' in config['MODEL'] else None
 
     layers = []
 
     previous_width = train_data.shape[0]
 
     # Add hidden layers.
-    for i, layer in enumerate(layer_sizes):
-        layers.append(FullyConnectedLayer(previous_width, layer,
-            activation=layer_activations[i]))
+    if layer_sizes != [0]:
+        for i, layer in enumerate(layer_sizes):
+            layers.append(FullyConnectedLayer(previous_width, layer,
+                activation=layer_activations[i]))
 
-        previous_width = layer
+            previous_width = layer
 
     # Add output layer.
     if config['MODEL']['loss_type'] == 'cross_entropy':
         layers.append(FullyConnectedLayer(previous_width,
-            val_labels.shape[0], activation='softmax'))
+            train_labels.shape[0], activation='softmax'))
     elif config['MODEL']['loss_type'] == 'L2':
         layers.append(FullyConnectedLayer(previous_width, 1, activation='linear'))
 
     network = SequentialNetwork(layers, cost_function=config['MODEL']['loss_type'])
 
+    batch_size = int(config['HYPER'].get('batch_size', 8))
+
+    plot = int(config['HYPER'].get('plot', -1))
+
     network.train(train_data, train_labels, val_data, val_labels,
         lr=float(config['HYPER']['learning_rate']), epochs=int(config['HYPER']['no_epochs']),
-        regularization=float(config['HYPER']['L2_regularization']), batch_size=8)
+        regularization=float(config['HYPER']['L2_regularization']), batch_size=batch_size, plot=plot)
 
     network.dump_weights('weights.txt')
 
