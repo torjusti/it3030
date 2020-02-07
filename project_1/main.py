@@ -99,7 +99,7 @@ class SequentialNetwork:
 
     def l2_regularization(self):
         """ Sum of squared weights across the neural network. """
-        return sum(np.sum(layer.weights) for layer in self.layers)
+        return sum(np.sum(layer.weights) + np.sum(layer.bias) for layer in self.layers)
 
     def l2_loss(self, output, target, regularization, derivative=False):
         """ Mean Squared Error loss function for regression. """
@@ -114,9 +114,8 @@ class SequentialNetwork:
             # The cross entropy delta is handled directly in the `backpropagation` method.
             raise NotImplementedError
 
-        # Add a small positive number to prevent taking the log of 0.
-        return -np.sum(target * np.log(output + 1e-15) + (1 - target) * np.log(
-            1 - output + 1e-15), axis=0) + regularization * self.l2_regularization()
+        # We add a small positive constant to prevent taking the log of 0.
+        return -np.sum(target * np.log(output + 1e-15), axis=0) + regularization * self.l2_regularization()
 
     def forward(self, x):
         """ Perform a forward pass through the network. """
@@ -138,9 +137,9 @@ class SequentialNetwork:
         for layer in self.layers:
             # Update the weights and add regularization.
             layer.weights -= lr * (layer.weight_gradient / example_count + regularization * layer.weights)
-            # Update the bias vector. Regularization is not needed here, since
-            # the regularization penalty function is not a function of the bias.
-            layer.bias -= lr * layer.bias_gradient / example_count
+            # Update the bias vector. Regularization is added here because the assignment
+            # explicitly mentions it, but it probably serves little purpose.
+            layer.bias -= lr * layer.bias_gradient / example_count + regularization * layer.bias
 
     def backpropagate(self, activation, samples, targets, lr, regularization):
         """ Update the network weights using backpropagation for gradient computation. """
@@ -153,8 +152,9 @@ class SequentialNetwork:
         else:
             # Standard backpropagation base case.
             error = self.loss(activation, targets, regularization, derivative=True) \
-                * last_layer.activation( last_layer.z, derivative=True)
+                * last_layer.activation(last_layer.z, derivative=True)
 
+        # Update gradients for this minibatch.
         self.update_gradient(error, len(self.layers) - 1, samples)
 
         for i in range(len(self.layers) - 2, -1, -1):
@@ -162,11 +162,13 @@ class SequentialNetwork:
             error = self.layers[i].activation(self.layers[i].z, derivative=True) \
                 * np.dot(self.layers[i + 1].weights.transpose(), error)
 
+            # Update gradients for this minibatch.
             self.update_gradient(error, i, samples)
 
     def train(self, data, labels, val_data=None, val_labels=None, epochs=50,
               lr=0.01, batch_size=8, regularization=0, plot=True):
         """ Train the network. """
+        # Save losses for plotting.
         train_losses = []
         val_losses = []
 
@@ -190,6 +192,8 @@ class SequentialNetwork:
             train_loss /= data.shape[1]
             train_losses.append(train_loss)
 
+            # Show some extra spice such as accuracy if we are
+            # doing classification, and we have validation data.
             validate = val_data is not None and val_labels is not None
 
             if validate:
@@ -204,6 +208,7 @@ class SequentialNetwork:
                 correct = np.count_nonzero(predictions == targets)
                 accuracy = correct / val_data.shape[1]
 
+            # Plot every `plot` epochs.
             if plot != -1 and epoch % plot == 0:
                 # Animate addition of new losses.
                 plt.plot(train_losses, 'b', label="Training loss")
