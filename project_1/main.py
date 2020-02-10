@@ -99,7 +99,7 @@ class SequentialNetwork:
 
     def l2_regularization(self):
         """ Sum of squared weights across the neural network. """
-        return sum(np.sum(layer.weights) + np.sum(layer.bias) for layer in self.layers)
+        return sum(np.sum(layer.weights ** 2) + np.sum(layer.bias ** 2) for layer in self.layers)
 
     def l2_loss(self, output, target, regularization, derivative=False):
         """ Mean Squared Error loss function for regression. """
@@ -166,7 +166,7 @@ class SequentialNetwork:
             self.update_gradient(error, i, samples)
 
     def train(self, data, labels, val_data=None, val_labels=None, epochs=50,
-              lr=0.01, batch_size=8, regularization=0, plot=True):
+              lr=0.01, batch_size=8, regularization=0, plot=True, enable_accuracy=False):
         """ Train the network. """
         # Save losses for plotting.
         train_losses = []
@@ -211,16 +211,18 @@ class SequentialNetwork:
             # Plot every `plot` epochs.
             if plot != -1 and epoch % plot == 0:
                 # Animate addition of new losses.
-                plt.plot(train_losses, 'b', label="Training loss")
-                plt.plot(val_losses, 'r', label="Validation loss")
+                plt.plot(train_losses, 'b', label='Training loss')
+                plt.plot(val_losses, 'r', label='Validation loss')
 
                 if epoch == 1:
                     plt.legend()
 
                 plt.pause(0.05)
 
-            if validate:
-                print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}, accuracy {accuracy}')
+            if validate and self.loss_name == 'cross_entropy' and enable_accuracy:
+                print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}, validation accuracy {accuracy}')
+            elif validate:
+                print(f'Epoch {epoch}: training loss {train_loss}, validation loss {val_loss}')
             else:
                 print(f'Epoch {epoch}: training loss {train_loss}')
 
@@ -233,9 +235,9 @@ class SequentialNetwork:
             # Disable truncation in output.
             with np.printoptions(threshold=np.inf):
                 for layer in self.layers:
-                    f.write(str(layer.weights))
-                    f.write(str(layer.bias))
-                    f.write('\n')
+                    f.write(f'Weights: {str(layer.weights)}\n')
+                    f.write(f'Bias: {str(layer.bias)}')
+                    f.write('\n\n')
 
 
 def load_data(filename):
@@ -309,7 +311,8 @@ def main():
 
     network.train(train_data, train_labels, val_data, val_labels,
         lr=float(config['HYPER']['learning_rate']), epochs=int(config['HYPER']['no_epochs']),
-        regularization=float(config['HYPER']['L2_regularization']), batch_size=batch_size, plot=plot)
+        regularization=float(config['HYPER']['L2_regularization']), batch_size=batch_size,
+        plot=plot, enable_accuracy=config['HYPER'].get('enable_accuracy', False) == 'True')
 
     network.dump_weights('weights.txt')
 
