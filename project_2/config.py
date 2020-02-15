@@ -1,3 +1,11 @@
 split_factor = 0.8
 train_test_split = 0.8
 latent_dim = 16
+latent_classifier_lr=0.001
+latent_classifier_freeze=False
+normal_classifier_lr=0.001
+autoencoder_lr=0.001
+batch_size=128
+autoencoder_epochs=10
+latent_classifier_epochs=10
+normal_classifier_epochs=10
