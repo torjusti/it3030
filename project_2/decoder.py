@@ -17,7 +17,6 @@ class Decoder(torch.nn.Module):
             torch.nn.ConvTranspose2d(32, 16, 3),
             torch.nn.ReLU(),
             torch.nn.ConvTranspose2d(16, 1, 3),
-            torch.nn.Tanh(),
         )
 
     def forward(self, x):

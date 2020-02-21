@@ -1,14 +1,19 @@
 import torch
-import numpy as np
 
 
 class Classifier(torch.nn.Module):
-    def __init__(self, input_dim, num_classes):
+    def __init__(self, num_classes):
         super().__init__()
 
         self.network = torch.nn.Sequential(
+            torch.nn.Conv2d(1, 16, 3),
+            torch.nn.ReLU(),
+            torch.nn.Conv2d(16, 32, 3),
+            torch.nn.MaxPool2d(2),
+            torch.nn.ReLU(),
+
             torch.nn.Flatten(),
-            torch.nn.Linear(np.prod(input_dim), 256),
+            torch.nn.Linear(12 * 12 * 32, 256),
             torch.nn.ReLU(),
             torch.nn.Linear(256, 128),
             torch.nn.ReLU(),

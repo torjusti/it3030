@@ -92,7 +92,7 @@ def main():
             latent_classifier_optimizer.step()
 
     # Create the standard classifier.
-    classifier = Classifier(input_dim, num_classes).to(device)
+    classifier = Classifier(num_classes).to(device)
 
     classifier_loss = torch.nn.CrossEntropyLoss()
     classifier_optimizer = torch.optim.Adam(classifier.parameters(),
