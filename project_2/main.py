@@ -37,7 +37,7 @@ def main():
 
     # Create data loaders.
     d1_loader = torch.utils.data.DataLoader(d1, batch_size=config.batch_size, shuffle=True)
-    d2_train_loader = torch.utils.data.DataLoader( d2_train, batch_size=config.batch_size, shuffle=True)
+    d2_train_loader = torch.utils.data.DataLoader(d2_train, batch_size=config.batch_size, shuffle=True)
     d2_val_loader = torch.utils.data.DataLoader(d2_val, batch_size=config.batch_size, shuffle=True)
 
     # Create the autoencoder model.

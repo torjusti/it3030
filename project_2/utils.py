@@ -5,6 +5,8 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 
 
 def compute_accuracy(classifier, data_loader, device=device):
+    classifier.eval()
+
     """ Utility function to compute the accuracy of a classifier on a dataset. """
     with torch.no_grad():
         num_correct = 0
@@ -16,7 +18,9 @@ def compute_accuracy(classifier, data_loader, device=device):
             num_correct += (predictions.indices == labels).sum().item()
             total += labels.shape[0]
 
-        return num_correct / total
+    classifier.train()
+
+    return num_correct / total
 
 
 def flatten_images(images, rows, cols):
