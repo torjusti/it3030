@@ -1,7 +1,7 @@
 from torch.optim import Adam
 
 # Factor deciding split between D1 and D2.
-split_factor = 0.1
+split_factor = 0.8
 # Percentage of D1 data used for training versus validation.
 d1_train_val_split = 0.8
 # Percentage of D2 training data to use for training versus validation.
@@ -13,7 +13,7 @@ latent_dim = 16
 # Learning rate for the latent classifier.
 latent_classifier_lr=0.001
 # Whether or not the classifier autoencoder should be frozen.
-latent_classifier_freeze=False
+latent_classifier_freeze=True
 # Learning rate for the standard classifier.
 normal_classifier_lr=0.001
 # Learning rate for the autoencoder.
@@ -39,4 +39,4 @@ normal_classifier_optim=Adam
 # Number of autoencoder reconstructions to show.
 num_reconstructions=16
 # The dataset to use. `mnist`, `fmnist`, 'kmnist', 'cifar', 'emnist'.
-dataset='emnist'
+dataset='mnist'

@@ -16,10 +16,11 @@ device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cp
 
 
 def main():
-    # Preprocessing applied to all samples.
+    # Preprocessing applied to all samples. I try to assume as little
+    # as possible about the image dimensions and colors, but the
+    # output size is going to be >= 28 pixels due to the shapes of
+    # the selected convolution and transposed convolution operators.
     transform = torchvision.transforms.Compose([
-        torchvision.transforms.Resize((28, 28)),
-        torchvision.transforms.Grayscale(),
         torchvision.transforms.ToTensor(),
     ])
 
@@ -36,6 +37,7 @@ def main():
 
     # Load the dataset.
     if config.dataset == 'emnist':
+        # For EMNIST, we need to specify which split to use.
         train_set = dataset('data', train=True, download=True, transform=transform, split='letters')
         test_set = dataset('data', train=False, download=True, transform=transform, split='letters')
     else:
@@ -44,9 +46,13 @@ def main():
 
     dataset = torch.utils.data.ConcatDataset([train_set, test_set])
 
+    # Find size of images in the dataset.
+    input_dim = dataset[0][0].shape
     # Find number of classes in dataset.
-    num_classes = 1 + (max(train_set.targets) if isinstance(train_set.targets,
-        list) else torch.max(train_set.targets).item())
+    if isinstance(train_set.targets, list):
+        num_classes = 1 + max(train_set.targets)
+    else:
+        num_classes = 1 + torch.max(train_set.targets).item()
 
     # Split dataset into D1 and D2.
     d1_indices, d2_indices = train_test_split(list(range(len(dataset))), train_size=config.split_factor,
@@ -54,43 +60,50 @@ def main():
     d1 = torch.utils.data.Subset(dataset, d1_indices)
     d2 = torch.utils.data.Subset(dataset, d2_indices)
 
-    # The entirety of D1 is used as a training set since no labels are available.
-    # We therefore only split it into a training set and a validation set.
+    # Split D1 into training and validation sets.  The entirety of D1 is used
+    # as a training set since no labels are available. We therefore only split
+    # it into a training set and a validation set.
     d1_train_indices, d1_val_indices = train_test_split(list(range(len(d1))),
                                                         train_size=config.d1_train_val_split,
                                                         stratify=[label for _, label in d1])
     d1_train = torch.utils.data.Subset(d1, d1_train_indices)
     d1_val = torch.utils.data.Subset(d1, d1_val_indices)
 
+    # Create data loaders for D1.
     d1_train_loader = torch.utils.data.DataLoader(d1_train, batch_size=config.batch_size, shuffle=True)
     d1_val_loader = torch.utils.data.DataLoader(d1_val, batch_size=config.batch_size, shuffle=True)
     # Data loader for the entire dataset, for testing classifiers on D1.
     d1_loader = torch.utils.data.DataLoader(d1, batch_size=config.batch_size, shuffle=True)
 
-    # Split D2 into training and validation datasets.
+    # Split D2 into training and testing datasets.
     d2_train_indices, d2_test_indices = train_test_split(list(range(len(d2))),
                                                          train_size=config.train_test_split,
                                                          stratify=[label for _, label in d2])
+
+    # Split testing dataset into testing and validation datasets.
     d2_train = torch.utils.data.Subset(d2, d2_train_indices)
     d2_train_indices, d2_val_indices = train_test_split(list(range(len(d2_train))),
                                                         train_size=config.d2_train_val_split,
                                                         stratify=[label for _, label in d2_train])
-
     d2_train = torch.utils.data.Subset(d2, d2_train_indices)
     d2_val = torch.utils.data.Subset(d2, d2_val_indices)
     d2_test = torch.utils.data.Subset(d2, d2_test_indices)
 
-
+    # Create data loaders for D2.
     d2_train_loader = torch.utils.data.DataLoader(d2_train, batch_size=config.batch_size, shuffle=True)
     d2_val_loader = torch.utils.data.DataLoader(d2_val, batch_size=config.batch_size, shuffle=True)
     d2_test_loader = torch.utils.data.DataLoader(d2_test, batch_size=config.batch_size, shuffle=True)
 
+    # -----------
+    # Autoencoder
+    # -----------
+
     # Create the autoencoder model.
-    autoencoder = AutoEncoder(config.latent_dim).to(device)
+    autoencoder = AutoEncoder(input_dim, config.latent_dim).to(device)
 
     autoencoder_loss = torch.nn.MSELoss(reduction='mean')
     autoencoder_optimizer = config.autoencoder_optim(autoencoder.parameters(),
-                                          lr=config.autoencoder_lr)
+                                                     lr=config.autoencoder_lr)
 
     tsne_plot(autoencoder.encoder, d1_val_loader, 'TSNE plot before training')
 
@@ -112,7 +125,6 @@ def main():
             total_train_loss += loss
             total_train_examples += images.shape[0]
 
-        # Turn network into evaluation mode.
         autoencoder.eval()
 
         # Test on validation set.
@@ -123,7 +135,6 @@ def main():
                 total_val_loss += autoencoder_loss(reconstruction, val_images)
                 total_val_examples += val_images.shape[0]
 
-        # Turn back into training mode.
         autoencoder.train()
 
         autoencoder_train_loss.append(total_train_loss / total_train_examples)
@@ -145,7 +156,7 @@ def main():
 
         size = math.ceil(math.sqrt(config.num_reconstructions))
 
-        ax[0].imshow(flatten_images(images[:config.num_reconstructions].squeeze(), size, size))
+        ax[0].imshow(flatten_images(images[:config.num_reconstructions].cpu().squeeze().numpy(), size, size))
         ax[0].set_title('Input images')
 
         ax[1].imshow(flatten_images(reconstruction, size, size))
@@ -155,13 +166,17 @@ def main():
 
     tsne_plot(autoencoder.encoder, d1_val_loader, 'TSNE plot after training autoencoder')
 
+    # --------------------------
+    # Semi-supervised classifier
+    # --------------------------
+
     # Create the latent classifier model.
     latent_classifier = LatentClassifier(autoencoder.encoder, config.latent_dim, num_classes,
                                          freeze=config.latent_classifier_freeze).to(device)
 
     latent_classifier_loss = torch.nn.CrossEntropyLoss()
     latent_classifier_optimizer = config.latent_classifier_optim(latent_classifier.parameters(),
-                                                   lr=config.latent_classifier_lr)
+                                                                 lr=config.latent_classifier_lr)
 
     # Statistics for the latent classifier.
     latent_classifier_train_accuracy = []
@@ -188,12 +203,16 @@ def main():
 
     tsne_plot(latent_classifier.encoder, d1_val_loader, 'TSNE plot after training classifier')
 
+    # -------------------
+    # Standard classifier
+    # -------------------
+
     # Statistics for the standard classifier.
     classifier_train_accuracy = []
     classifier_val_accuracy = []
 
     # Create the standard classifier.
-    classifier = Classifier(num_classes).to(device)
+    classifier = Classifier(input_dim, num_classes).to(device)
 
     classifier_loss = torch.nn.CrossEntropyLoss()
     classifier_optimizer = config.normal_classifier_optim(classifier.parameters(),
@@ -218,6 +237,10 @@ def main():
         classifier_train_accuracy.append(total_train_correct / total_train_samples)
         classifier_val_accuracy.append(compute_accuracy(classifier, d2_val_loader, device=device))
 
+    # -----------
+    # Final plots
+    # -----------
+
     plt.plot(latent_classifier_train_accuracy, label='Semi-supervised training accuracy')
     plt.plot(latent_classifier_val_accuracy, label='Semi-supervised validation accuracy')
     plt.plot(classifier_train_accuracy, label='Supervised training accuracy')
@@ -232,6 +255,7 @@ def main():
     print(f'Accuracy on D2 - FC using normal classfier: {compute_accuracy(classifier, d2_test_loader, device=device)}')
     print(f'Accuracy on D1 using latent classfier: {compute_accuracy(latent_classifier, d1_loader, device=device)}')
     print(f'Accuracy on D1 using normal classfier: {compute_accuracy(classifier, d1_loader, device=device)}')
+
 
 if __name__ == '__main__':
     main()

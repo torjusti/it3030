@@ -6,9 +6,9 @@ class ClassifierHead(torch.nn.Module):
         super().__init__()
 
         self.network = torch.nn.Sequential(
-            torch.nn.Linear(latent_dim, 32),
+            torch.nn.Linear(latent_dim, 64),
             torch.nn.ReLU(),
-            torch.nn.Linear(32, num_classes),
+            torch.nn.Linear(64, num_classes),
         )
 
     def forward(self, x):

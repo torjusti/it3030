@@ -27,8 +27,16 @@ def compute_accuracy(classifier, data_loader, device=device):
 
 def flatten_images(images, rows, cols):
     """ Merge an array of images into one big image. """
-    width, height = images.shape[1], images.shape[2]
-    image = np.zeros(shape=(rows * height, cols * width))
+    if len(images.shape) == 4:
+        depth, width, height = images.shape[1:]
+    else:
+        width, height = images.shape[1:]
+        depth = None
+
+    if depth:
+        image = np.zeros(shape=(rows * height, cols * width, depth))
+    else:
+        image = np.zeros(shape=(rows * height, cols * width))
 
     i = 0
 
@@ -37,7 +45,12 @@ def flatten_images(images, rows, cols):
             if i >= len(images):
                 break
 
-            image[row * height : (row + 1) * height, col * width : (col + 1) * width] = images[i]
+            if depth:
+                image[row * height : (row + 1) * height, col * width : (col + 1) * width, :] = \
+                    np.rollaxis(images[i], 0, 3)
+            else:
+                image[row * height : (row + 1) * height, col * width : (col + 1) * width] = images[i]
+
             i += 1
 
     return image

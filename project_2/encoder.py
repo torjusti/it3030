@@ -2,11 +2,11 @@ import torch
 
 
 class Encoder(torch.nn.Module):
-    def __init__(self, latent_dim):
+    def __init__(self, input_dim, latent_dim):
         super().__init__()
 
         self.network = torch.nn.Sequential(
-            torch.nn.Conv2d(1, 16, 3),
+            torch.nn.Conv2d(input_dim[0], 16, 3),
             torch.nn.ReLU(),
             torch.nn.Conv2d(16, 32, 3),
             torch.nn.ReLU(),
