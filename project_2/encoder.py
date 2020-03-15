@@ -9,6 +9,7 @@ class Encoder(torch.nn.Module):
             torch.nn.Conv2d(input_dim[0], 16, 3),
             torch.nn.ReLU(),
             torch.nn.Conv2d(16, 32, 3),
+            torch.nn.AdaptiveMaxPool2d((24, 24)),
             torch.nn.ReLU(),
 
             torch.nn.Flatten(),

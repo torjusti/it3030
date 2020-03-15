@@ -21,11 +21,11 @@ autoencoder_lr=0.001
 # Batch size to use. Currently, the same value is used everywhere.
 batch_size=128
 # Number of epochs to train the autoencoder for.
-autoencoder_epochs=20
+autoencoder_epochs=15
 # Number of epochs to train the latent classifier for.
-latent_classifier_epochs=20
+latent_classifier_epochs=15
 # Number of epochs to train the normal classifier for.
-normal_classifier_epochs=20
+normal_classifier_epochs=15
 # A flag indicating whether or not tSNE plots of latent
 # vectors will be shown at the 3 stages of training.
 # Note that freezing of weights affects the last plot.
@@ -39,4 +39,4 @@ normal_classifier_optim=Adam
 # Number of autoencoder reconstructions to show.
 num_reconstructions=16
 # The dataset to use. `mnist`, `fmnist`, 'kmnist', 'cifar', 'emnist'.
-dataset='mnist'
+dataset='cifar'

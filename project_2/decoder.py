@@ -1,4 +1,5 @@
 import torch
+import torch.nn.functional as F
 import numpy as np
 
 
@@ -20,12 +21,11 @@ class Decoder(torch.nn.Module):
             torch.nn.ConvTranspose2d(32, 16, 3),
             torch.nn.ReLU(),
             torch.nn.ConvTranspose2d(16, input_dim[0], 3),
-            torch.nn.Flatten(),
-            torch.nn.Linear(input_dim[0] * 28 * 28, np.prod(input_dim)),
-            torch.nn.Tanh(),
         )
 
     def forward(self, x):
+        size = (self.input_dim[1], self.input_dim[2])
         x = self.linear_layers(x)
         x = x.view((x.shape[0], 32, 24, 24))
-        return self.conv_layers(x).reshape(x.shape[0], *self.input_dim)
+        return torch.tanh(F.interpolate(self.conv_layers(x), size, mode='bilinear',
+                                        align_corners=False))
