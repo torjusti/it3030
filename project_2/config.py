@@ -39,4 +39,4 @@ normal_classifier_optim=Adam
 # Number of autoencoder reconstructions to show.
 num_reconstructions=16
 # The dataset to use. `mnist`, `fmnist`, 'kmnist', 'cifar', 'emnist'.
-dataset='cifar'
+dataset='mnist'
