@@ -142,6 +142,7 @@ def main():
 
     plt.plot(autoencoder_train_loss, 'b', label='Autoencoder training loss')
     plt.plot(autoencoder_val_loss, 'r', label='Autoencoder validation loss')
+    plt.legend()
     plt.title('Autoencoder loss')
     plt.show()
 
