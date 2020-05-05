@@ -11,7 +11,7 @@ train_test_split = 0.8
 # Number of latent dimensions.
 latent_dim = 16
 # Learning rate for the latent classifier.
-latent_classifier_lr=0.001
+latent_classifier_lr=0.005
 # Whether or not the classifier autoencoder should be frozen.
 latent_classifier_freeze=True
 # Learning rate for the standard classifier.
@@ -21,11 +21,11 @@ autoencoder_lr=0.001
 # Batch size to use. Currently, the same value is used everywhere.
 batch_size=128
 # Number of epochs to train the autoencoder for.
-autoencoder_epochs=15
+autoencoder_epochs=5
 # Number of epochs to train the latent classifier for.
-latent_classifier_epochs=15
+latent_classifier_epochs=5
 # Number of epochs to train the normal classifier for.
-normal_classifier_epochs=15
+normal_classifier_epochs=5
 # A flag indicating whether or not tSNE plots of latent
 # vectors will be shown at the 3 stages of training.
 # Note that freezing of weights affects the last plot.
@@ -39,4 +39,4 @@ normal_classifier_optim=Adam
 # Number of autoencoder reconstructions to show.
 num_reconstructions=16
 # The dataset to use. `mnist`, `fmnist`, 'kmnist', 'cifar', 'emnist'.
-dataset='mnist'
+dataset='fmnist'
